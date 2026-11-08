@@ -33,7 +33,7 @@
 #   USE_RT          0 = normal priority (default), 1 = chrt -f 99. The run that
 #                   first delivered frames used no chrt; the one that died in
 #                   rebuffer used chrt -f 99 with sched_rt_runtime_us=-1.
-#   CONSUMER_TIMEOUT  seconds before the frame reader is killed, default 60
+#   CONSUMER_TIMEOUT  seconds before the frame reader is killed, default 120
 #
 # The script writes a bundle the caller can hand over verbatim:
 #   $OUT/run.log, summary.txt, logs/*.log, config/, lsusb.txt, shm-listing.txt ...
@@ -63,7 +63,7 @@ CPI_SIZE="${CPI_SIZE:-1048576}"
 RUN_HWC="${RUN_HWC:-1}"
 RESTORE_USBFS="${RESTORE_USBFS:-0}"
 USE_RT="${USE_RT:-0}"
-CONSUMER_TIMEOUT="${CONSUMER_TIMEOUT:-60}"
+CONSUMER_TIMEOUT="${CONSUMER_TIMEOUT:-120}"
 
 # ------------------------------------------------------------ locate the tree
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -229,7 +229,7 @@ fi
 [ "$rc" -ne 0 ] && { bad "preflight failed"; exit 1; }
 ok "librtlsdr fork: $PREFIX/lib"
 
-if [ ! -x "$CORE/daq_consumer.out" ] || [ "$CORE/daq_consumer.c" -nt "$CORE/daq_consumer.out" ]; then
+if true; then   # always rebuild: a stale binary once cost a whole run
   info "building daq_consumer.out"
   ( cd "$CORE" && gcc -Wall -std=gnu99 -O2 -I. -o daq_consumer.out daq_consumer.c \
       sh_mem_util.o iq_header.o log.o ini.o -lrt -lm ) > "$OUT/logs/consumer-build.log" 2>&1
@@ -355,6 +355,23 @@ else
   info "--> no phase calibration; DoA is not possible in this run"
 fi
 
+# --------------------------------------------------------------- reader
+# Start it IMMEDIATELY, not as a step after the settle. Python's outShmemIface
+# opens fw_<stage> for WRITE, which blocks until a downstream reader appears, and
+# delay_sync cannot create delay_sync_hwc (which hw_controller needs) until it
+# gets past that open. So with no reader nothing bootstraps: delay_sync and
+# hw_controller both sit blocked and it looks like a silent hang.
+if [ "$COHERENT" -eq 1 ]; then
+  CONSUMER_STAGE="delay_sync_iq"
+  info "reader will take delay_sync_iq (delay_sync owns decimator_out)"
+else
+  CONSUMER_STAGE="decimator_out"
+fi
+timeout "$CONSUMER_TIMEOUT" "$CORE/daq_consumer.out" "$FRAMES" "$CONSUMER_STAGE" \
+    > "$OUT/logs/consumer.log" 2>&1 &
+CONSUMER_PID=$!
+ok "reader started on $CONSUMER_STAGE (pid $CONSUMER_PID)"
+
 info "checking every stage is alive"
 sleep 3
 alive=1
@@ -420,17 +437,11 @@ info "letting the chain settle for ${SETTLE}s"
 sleep "$SETTLE"
 
 # --------------------------------------------------------------- consume
-step "consuming decimator_out"
-# REQUIRED, not optional: decimate.out fills decimator_out_A/_B and then stalls,
-# which stalls rebuffer and rtl_daq. With no consumer nothing moves at all.
-if [ "$COHERENT" -eq 1 ]; then
-  CONSUMER_STAGE="delay_sync_iq"
-  info "delay_sync owns decimator_out, so consuming delay_sync_iq"
-else
-  CONSUMER_STAGE="decimator_out"
-fi
-timeout "$CONSUMER_TIMEOUT" "$CORE/daq_consumer.out" "$FRAMES" "$CONSUMER_STAGE" \
-    > "$OUT/logs/consumer.log" 2>&1
+step "reading $CONSUMER_STAGE"
+# The reader is not a convenience: the chain back-pressures on itself, and with a
+# coherent stage the reader is also what unblocks delay_sync's bootstrap.
+info "waiting for the reader to collect ${FRAMES} frame(s)"
+wait "$CONSUMER_PID" 2>/dev/null
 CONSUMER_RC=$?
 if [ "$CONSUMER_RC" -eq 124 ]; then
   warn "consumer timed out after ${CONSUMER_TIMEOUT}s waiting for frames"

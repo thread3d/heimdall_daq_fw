@@ -24,7 +24,11 @@
 #   FRAMES          IQ frames to consume, default 8
 #   SETTLE          seconds to let the chain fill buffers before consuming, default 6
 #   CPI_SIZE        samples per frame, default 1048576
-#   RUN_HWC         1 to also start hw_controller.py (noise source / switch matrix), default 0
+#   RUN_HWC         1 to start hw_controller.py, default 1. REQUIRED for coherence:
+#                   delay_sync.py blocks on wait_buff_free() of the delay_sync_hwc
+#                   channel, so it makes no progress unless hw_controller consumes it.
+#   PYTHON          interpreter for the Python stages. Auto-detected otherwise; it
+#                   must be able to import skrf AND numba.
 #   RESTORE_USBFS   1 to set usbfs_memory_mb back to 16 when finished, default 0
 #   USE_RT          0 = normal priority (default), 1 = chrt -f 99. The run that
 #                   first delivered frames used no chrt; the one that died in
@@ -45,6 +49,8 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 CALLER="${SUDO_USER:-}"
+CALLER_HOME="$HOME"
+[ -n "$CALLER" ] && CALLER_HOME="/home/$CALLER"
 [ "$CALLER" = "root" ] && CALLER=""
 
 CENTRE_MHZ="${CENTRE_MHZ:-868.3}"
@@ -54,7 +60,7 @@ GAIN="${GAIN:-400}"
 FRAMES="${FRAMES:-8}"
 SETTLE="${SETTLE:-6}"
 CPI_SIZE="${CPI_SIZE:-1048576}"
-RUN_HWC="${RUN_HWC:-0}"
+RUN_HWC="${RUN_HWC:-1}"
 RESTORE_USBFS="${RESTORE_USBFS:-0}"
 USE_RT="${USE_RT:-0}"
 CONSUMER_TIMEOUT="${CONSUMER_TIMEOUT:-60}"
@@ -76,6 +82,32 @@ LOGS="$FW/_logs"
 PREFIX="${KRAKEN_LIB_PREFIX:-$HOME/projects/KrakenSDR/krakensdr/deps/prefix}"
 [ -n "$CALLER" ] && PREFIX="${KRAKEN_LIB_PREFIX:-/home/$CALLER/projects/KrakenSDR/krakensdr/deps/prefix}"
 
+# --------------------------------------------------------------- interpreter
+# delay_sync.py needs skrf AND numba; the system python3 has neither, and upstream
+# resorts to conda for exactly this reason. Prefer any interpreter that has both,
+# so the coherent stages run instead of being skipped.
+pick_python() {
+  local c
+  for c in ${PYTHON:-} \
+           "$CALLER_HOME/miniforge3/envs/kraken/bin/python3" \
+           "$CALLER_HOME/miniconda3/envs/kraken/bin/python3" \
+           "$CALLER_HOME/miniforge3/bin/python3" \
+           "$CALLER_HOME/miniconda3/bin/python3" \
+           /usr/bin/python3; do
+    [ -n "$c" ] || continue
+    [ -x "$c" ] || continue
+    if "$c" -c "import skrf, numba" >/dev/null 2>&1; then echo "$c"; return 0; fi
+  done
+  return 1
+}
+PY=""
+if PY=$(pick_python); then
+  PY_DEPS=1
+else
+  PY=/usr/bin/python3
+  PY_DEPS=0
+fi
+
 STAMP=$(date +%Y%m%d-%H%M%S)
 OUT="$ROOT/logs/run-$STAMP"
 mkdir -p "$OUT/logs" "$OUT/config"
@@ -96,6 +128,7 @@ echo "  started  : $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 echo "  caller   : ${CALLER:-root}"
 echo "  tree     : $ROOT"
 echo "  bundle   : $OUT"
+echo "  python   : $PY (skrf+numba: $([ "$PY_DEPS" = 1 ] && echo yes || echo NO))"
 
 # ------------------------------------------------------------- record the box
 step "host"
@@ -152,8 +185,19 @@ for obj in /dev/shm/decimator_in_A /dev/shm/decimator_in_B \
 done
 if [ "$removed" -gt 0 ]; then ok "removed $removed stale /dev/shm object(s)"
 else ok "no stale /dev/shm objects"; fi
-[ -n "$(ls /dev/shm 2>/dev/null | grep -iE 'decimator|delay_sync|HEIMDALL')" ] && \
-  warn "some /dev/shm objects remain (held by another user?)"
+# Verify, do not assume. sh_mem_util's producer opens with O_RDWR and, if that
+# fails (e.g. an object left by another user), init returns a small negative code
+# that upstream never prints - the only symptom is
+#   FATAL rebuffer.c:173: Shared memory initialization failed
+leftover=$(ls /dev/shm 2>/dev/null | grep -iE '^(decimator|delay_sync|HEIMDALL)')
+if [ -n "$leftover" ]; then
+  bad "shared memory objects could not be removed:"
+  printf '%s\n' "$leftover" | sed 's/^/     /'
+  info "These belong to another user and will make rebuffer fail. Remove them:"
+  info "  sudo rm -f /dev/shm/decimator_* /dev/shm/delay_sync_* /dev/shm/HEIMDALL_DAQ_FW_*"
+  exit 1
+fi
+ok "no shared memory objects left behind"
 
 # shared memory capacity: decimator_out is large
 shm_avail=$(df -Pm /dev/shm 2>/dev/null | awk 'NR==2{print $4}')
@@ -208,7 +252,7 @@ grep -E "^(num_ch|center_freq|sample_rate|gain|cpi_size|decimation_ratio|daq_buf
 cp "$FW/daq_chain_config.ini" "$OUT/config/daq_chain_config.ini.used"
 
 cd "$FW" || exit 1
-python3 fir_filter_designer.py > "$OUT/logs/fir_design.log" 2>&1
+"$PY" fir_filter_designer.py > "$OUT/logs/fir_design.log" 2>&1
 if [ $? -ne 0 ]; then bad "fir_filter_designer.py failed"; tail -5 "$OUT/logs/fir_design.log"; exit 1; fi
 ok "FIR coefficients regenerated"
 
@@ -283,24 +327,31 @@ sleep 2
 
 # hw_controller drives the switch matrix / noise source over I2C. Non-fatal.
 if [ "$RUN_HWC" = "1" ]; then
-  if ( cd "$FW" && python3 -c "import sys; sys.path.insert(0,'_daq_core'); import hw_controller" ) >/dev/null 2>&1; then
-    $CHRT python3 _daq_core/hw_controller.py > "$OUT/logs/hw_controller.log" 2>&1 &
-    PIDS="$PIDS $!"
-    ok "hw_controller.py started"
+  # hw_controller is a __main__ script (importing it RUNS it), so start it and
+  # judge success from whether it is still alive, not from an import test.
+  # It is required for coherence: delay_sync blocks on wait_buff_free() of the
+  # delay_sync_hwc channel until something consumes it.
+  $CHRT "$PY" _daq_core/hw_controller.py > "$OUT/logs/hw_controller.log" 2>&1 &
+  HWC_PID=$!
+  PIDS="$PIDS $HWC_PID"
+  sleep 2
+  if kill -0 "$HWC_PID" 2>/dev/null; then
+    ok "hw_controller.py running"
   else
-    warn "hw_controller.py cannot import its dependencies -- skipped"
+    warn "hw_controller.py exited -- see logs/hw_controller.log"
+    tail -5 "$OUT/logs/hw_controller.log" 2>/dev/null | sed 's/^/     /'
   fi
 fi
 
 # delay_sync gives coherence. It needs skrf + numba.
 COHERENT=0
-if python3 -c "import skrf, numba" >/dev/null 2>&1; then
-  $CHRT python3 _daq_core/delay_sync.py > "$OUT/logs/delay_sync.log" 2>&1 &
+if [ "$PY_DEPS" = "1" ]; then
+  $CHRT "$PY" _daq_core/delay_sync.py > "$OUT/logs/delay_sync.log" 2>&1 &
   PIDS="$PIDS $!"
   ok "delay_sync.py started -- this run IS coherent"
   COHERENT=1
 else
-  warn "delay_sync.py skipped: needs skrf + numba (not installed)"
+  warn "delay_sync.py skipped: no interpreter with skrf + numba (set PYTHON=...)"
   info "--> no phase calibration; DoA is not possible in this run"
 fi
 
@@ -315,6 +366,23 @@ for p in rtl_daq.out rebuffer.out decimate.out; do
     alive=0
   fi
 done
+# The Python stages are newer here and more likely to fall over: numba compiles
+# on first run, and delay_sync blocks forever if hw_controller is not consuming
+# its delay_sync_hwc channel.
+if pgrep -f "_daq_core/hw_controller.py" >/dev/null 2>&1; then
+  ok "hw_controller.py running"
+elif [ "$RUN_HWC" = "1" ]; then
+  bad "hw_controller.py NOT running (delay_sync will block without it)"
+  tail -8 "$OUT/logs/hw_controller.log" 2>/dev/null | sed 's/^/     /'
+  alive=0
+fi
+if pgrep -f "_daq_core/delay_sync.py" >/dev/null 2>&1; then
+  ok "delay_sync.py running"
+elif [ "$PY_DEPS" = "1" ]; then
+  bad "delay_sync.py exited"
+  tail -12 "$OUT/logs/delay_sync.log" 2>/dev/null | sed 's/^/     /'
+  alive=0
+fi
 if [ "$alive" -ne 1 ]; then
   step "stage logs (this is where the answer is)"
   for l in rtl_daq rebuffer decimator; do

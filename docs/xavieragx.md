@@ -169,3 +169,72 @@ decimation_ratio = 1
    works" to "coherent", and the only route to DoA. Both are awkward on aarch64/Python 3.8 without
    conda, which is why upstream uses conda.
 3. Then the ogn-rf source adapter, reading `decimator_out` instead of `librtlsdr`.
+
+## What direction finding actually needs
+
+Three layers, and it is worth being precise about which are satisfiable here.
+
+### 1. Phase coherence — available now, nothing to install
+
+The array is only coherent after `delay_sync.py` has applied its delay/phase corrections. Two
+Python stages are involved and **both** must run:
+
+| Stage | Needs | Status |
+|---|---|---|
+| `delay_sync.py` | `numba`, `skrf` | available in `~/miniforge3/envs/kraken` |
+| `hw_controller.py` | `numpy`, `pyzmq` | available in the same env |
+
+`delay_sync.py:462` calls `wait_buff_free()` on the `delay_sync_hwc` channel, so **it blocks forever
+unless `hw_controller.py` is consuming that channel**. Starting one without the other looks like a
+hang, not an error. `sudo-daq-run.sh` starts both and checks both are alive.
+
+An existing conda environment already has exactly what upstream asks for:
+
+```
+~/miniforge3/envs/kraken/bin/python3   Python 3.9.7
+  numpy 1.23.5   scipy 1.9.3   numba 0.56.4   skrf 0.26.0   plotly 5.14.0   pyargus
+```
+
+`numba 0.56.4` is the precise version upstream's README pins (`conda install numba==0.56.4`), so
+this is the intended interpreter. **No installation is required** — the system `python3` simply does
+not have the packages, which is why the stages were being skipped. `sudo-daq-run.sh` now auto-detects
+an interpreter that can import `skrf` **and** `numba` (override with `PYTHON=...`).
+
+`numba` really does work on this aarch64 host — the two `@njit` hot loops were compiled and executed
+as a standalone check:
+
+```
+correct_iq compiled+ran  : 2.387 s      (JIT compile dominates the first call)
+copy_iq    compiled+ran  : 0.502 s
+njit is real numba       : CPUDispatcher
+output finite            : True
+```
+
+`skrf` is only needed for the `touchstone` IQ-adjustment source (`rf.Network` on `_calibration/*.s1p`).
+The default `iq_adjust_source = explicit-time-delay` never touches it — so `skrf` being present is a
+bonus, not the critical dependency.
+
+### 2. Array calibration — needs the noise source
+
+Coherence between *cables and antennas* is measured by switching the receiver's internal noise source
+into the antenna path and comparing channels. `hw_controller.py` drives that, and the timing lives in
+the `[calibration]` section of `daq_chain_config.ini` (`en_iq_cal`, `cal_frame_interval`,
+`cal_frame_burst_size`, `maximum_sync_fails`). It needs no I2C on a KrakenSDR: `DACController` is
+only constructed when `en_adpis = 1`, which this configuration does not set.
+
+### 3. The DoA algorithm — NOT present
+
+Coherent IQ is not a bearing. Computing one needs the MUSIC direction-finding application, which is
+a separate program that consumes the IQ stream:
+
+- [`krakenrf/krakensdr_doa`](https://github.com/krakenrf/krakensdr_doa) — the Python/`pyargus`
+  generation, matching this HeIMDALL
+- [`krakenrf/krakensdr_suite`](https://github.com/krakenrf/krakensdr_suite) — the current V2
+  all-C++ suite (`kraken_doa_v2`), which is what upstream ships today
+
+Neither is cloned or built here. `pyargus` (the DOA maths) *is* already in the `kraken` environment,
+so `krakensdr_doa` is the shorter path.
+
+So the honest summary: **the coherence layer can be switched on immediately with what is already
+installed**; the direction-finding application is the remaining piece, and it is a separate
+build-and-run task rather than a missing dependency.

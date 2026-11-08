@@ -1,0 +1,102 @@
+HeIMDALL DAQ run
+  started  : 2026-11-08T12:09:41Z
+  caller   : threaded
+  tree     : /home/threaded/projects/KrakenSDR/heimdall_daq_fw
+  bundle   : /home/threaded/projects/KrakenSDR/heimdall_daq_fw/logs/run-20261108-130941
+
+[1m=== host ===[0m
+  uname    : Linux 5.10.104-tegra aarch64
+  distro   : Ubuntu 20.04.6 LTS
+  l4t      : # R35 (release), REVISION: 5.0, GCID: 35550185, BOARD: t186ref, EABI: aarch64, DATE: Tue Feb 20 04:46:31 UTC 2024
+  nproc    : 8
+  uptime   :  13:09:41 up  2:19,  2 users,  load average: 1.16, 1.24, 1.33
+  kernel usbfs_memory_mb (before): 0
+       lsusb saved (5 RTL2838 chains)
+
+[1m=== raise libusb buffer limit ===[0m
+[32m[ok][0m usbfs_memory_mb: 0 -> 0 (unlimited)
+
+[1m=== clear stale state ===[0m
+[32m[ok][0m removed 4 stale /dev/shm object(s)
+[32m[ok][0m /dev/shm free: 15502 MB (need ~128 MB)
+[32m[ok][0m sched_rt_runtime_us = -1
+[32m[ok][0m caches dropped
+
+[1m=== preflight ===[0m
+[32m[ok][0m rtl_daq.out
+[32m[ok][0m rebuffer.out
+[32m[ok][0m decimate.out
+[32m[ok][0m librtlsdr fork: /home/threaded/projects/KrakenSDR/krakensdr/deps/prefix/lib
+
+[1m=== configure ===[0m
+  num_ch = 1
+  daq_buffer_size = 262144
+  center_freq = 868300000
+  sample_rate = 1024000
+  gain = 400
+  en_noise_source_ctr = 1
+  ctr_channel_serial_no = 1000
+  cpi_size = 1048576
+  decimation_ratio = 1
+  gain_lock_interval = 0
+  out_data_iface_type = shmem
+[32m[ok][0m FIR coefficients regenerated
+
+[1m=== control FIFOs ===[0m
+[32m[ok][0m 8 FIFOs created in /home/threaded/projects/KrakenSDR/heimdall_daq_fw/Firmware/_data_control
+
+[1m=== starting DAQ chain ===[0m
+       LD_LIBRARY_PATH=/home/threaded/projects/KrakenSDR/krakensdr/deps/prefix/lib
+[33m[warn][0m chrt unavailable
+[33m[warn][0m delay_sync.py skipped: needs skrf + numba (not installed)
+       --> no phase calibration; DoA is not possible in this run
+       checking every stage is alive
+[32m[ok][0m rtl_daq.out running
+[32m[ok][0m rebuffer.out running
+[32m[ok][0m decimate.out running
+       letting the chain settle for 6s
+
+[1m=== consuming decimator_out ===[0m
+  attaching to decimator_out_A / decimator_out_B
+  attached
+  frame  0: type=0 chs=1 cpi=1048576 depth=32B dtype=3 fs=1.024 MHz fc=868.300 MHz block=3 cpi_idx=0 t=1794139786424
+              raw[0..7] as bytes: 81 80 80 3b 81 80 80 bb 81 80 80 bb 81 80 80 3b 81 80 80 3b 81 80 80 bb 81 80 80 bb 81 80 80 bb
+              as float32: 0.00392157 -0.00392157 -0.00392157 0.00392157 0.00392157 -0.00392157 -0.00392157 -0.00392157
+              as int32  : 998277249 -1149206399 -1149206399 998277249 998277249 -1149206399 -1149206399 -1149206399
+              as int16  : -32639 15232 -32639 -17536 -32639 -17536 -32639 15232
+              ch0=-31.0dBFS  
+  frame  1: type=0 chs=1 cpi=1048576 depth=32B dtype=3 fs=1.024 MHz fc=868.300 MHz block=7 cpi_idx=1 t=1794139787449
+              raw[0..7] as bytes: c1 c0 40 3c c1 c0 40 3c e1 e0 e0 3c 91 90 10 3d e1 e0 e0 bc a1 a0 a0 3c 99 98 98 bd c1 c0 40 bc
+              as float32: 0.0117647 0.0117647 0.027451 0.0352941 -0.027451 0.0196078 -0.0745098 -0.0117647
+              as int32  : 1010876609 1010876609 1021370593 1024495761 -1126113055 1017159841 -1114072935 -1136607039
+              as int16  : -16191 15424 -16191 15424 -7967 15584 -28527 15632
+              ch0=-29.6dBFS  
+  frame  2: type=0 chs=1 cpi=1048576 depth=32B dtype=3 fs=1.024 MHz fc=868.300 MHz block=11 cpi_idx=2 t=1794139788472
+              raw[0..7] as bytes: b1 b0 30 3d a1 a0 a0 bc c1 c0 40 bc a1 a0 a0 bc c1 c0 40 3c 81 80 80 3b b1 b0 30 3d e1 e0 e0 3c
+              as float32: 0.0431373 -0.0196078 -0.0117647 -0.0196078 0.0117647 0.00392157 0.0431373 0.027451
+              as int32  : 1026601137 -1130323807 -1136607039 -1130323807 1010876609 998277249 1026601137 1021370593
+              as int16  : -20303 15664 -24415 -17248 -16191 -17344 -24415 -17248
+              ch0=-30.9dBFS  
+  
+  read 3 frame(s) from decimator_out_A
+
+[1m=== verdict ===[0m
+frames read from decimator_out : 3 / 3
+libusb submit failures         : 0
+coherent (delay_sync running)  : 0
+[32m[ok][0m 3 IQ frame(s) captured with 1 channel(s)
+              ch0=-31.0dBFS  
+              ch0=-29.6dBFS  
+              ch0=-30.9dBFS  
+       reminder: not coherent, so no DoA from this run
+
+[1m=== bundle ===[0m
+  56K	/home/threaded/projects/KrakenSDR/heimdall_daq_fw/logs/run-20261108-130941
+
+[32m[ok][0m log bundle: /home/threaded/projects/KrakenSDR/heimdall_daq_fw/logs/run-20261108-130941
+       hand over that directory, or just summary.txt + logs/consumer.log + logs/rtl_daq.log
+
+[1m=== stopping ===[0m
+[32m[ok][0m stopped
+[32m[ok][0m config restored
+       usbfs_memory_mb left at 0 (set RESTORE_USBFS=1 to put it back)

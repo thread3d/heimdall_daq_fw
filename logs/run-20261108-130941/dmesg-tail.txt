@@ -1,0 +1,40 @@
+[   52.081650] hub 1-4.4:1.0: 4 ports detected
+[   95.720518]  mmcblk0: p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15 p16 p17 p18 p19 p20 p21 p22 p23 p24 p25 p26 p27 p28 p29 p30 p31 p32 p33 p34 p35 p36 p37 p38 p39 p40 p41
+[ 5120.227790] usb 1-4.3: new high-speed USB device number 7 using tegra-xusb
+[ 5120.332036] usb 1-4.3: New USB device found, idVendor=0424, idProduct=2517, bcdDevice= 0.02
+[ 5120.332044] usb 1-4.3: New USB device strings: Mfr=0, Product=0, SerialNumber=0
+[ 5120.333538] hub 1-4.3:1.0: USB hub found
+[ 5120.333611] hub 1-4.3:1.0: 7 ports detected
+[ 5120.627778] usb 1-4.3.2: new high-speed USB device number 8 using tegra-xusb
+[ 5120.739506] usb 1-4.3.2: New USB device found, idVendor=0bda, idProduct=2838, bcdDevice= 1.00
+[ 5120.739514] usb 1-4.3.2: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[ 5120.739536] usb 1-4.3.2: Product: RTL2838UHIDIR
+[ 5120.739540] usb 1-4.3.2: Manufacturer: Realtek
+[ 5120.739543] usb 1-4.3.2: SerialNumber: 1003
+[ 5120.831775] usb 1-4.3.3: new high-speed USB device number 9 using tegra-xusb
+[ 5120.947453] usb 1-4.3.3: New USB device found, idVendor=0bda, idProduct=2838, bcdDevice= 1.00
+[ 5120.947461] usb 1-4.3.3: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[ 5120.947489] usb 1-4.3.3: Product: RTL2838UHIDIR
+[ 5120.947493] usb 1-4.3.3: Manufacturer: Realtek
+[ 5120.947496] usb 1-4.3.3: SerialNumber: 1002
+[ 5121.043750] usb 1-4.3.4: new high-speed USB device number 10 using tegra-xusb
+[ 5121.159470] usb 1-4.3.4: New USB device found, idVendor=0bda, idProduct=2838, bcdDevice= 1.00
+[ 5121.159497] usb 1-4.3.4: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[ 5121.159504] usb 1-4.3.4: Product: RTL2838UHIDIR
+[ 5121.159508] usb 1-4.3.4: Manufacturer: Realtek
+[ 5121.159511] usb 1-4.3.4: SerialNumber: 1001
+[ 5121.247755] usb 1-4.3.5: new high-speed USB device number 11 using tegra-xusb
+[ 5121.359404] usb 1-4.3.5: New USB device found, idVendor=0bda, idProduct=2838, bcdDevice= 1.00
+[ 5121.359413] usb 1-4.3.5: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[ 5121.359433] usb 1-4.3.5: Product: RTL2838UHIDIR
+[ 5121.359437] usb 1-4.3.5: Manufacturer: Realtek
+[ 5121.359441] usb 1-4.3.5: SerialNumber: 1000
+[ 5121.451768] usb 1-4.3.6: new high-speed USB device number 12 using tegra-xusb
+[ 5121.563455] usb 1-4.3.6: New USB device found, idVendor=0bda, idProduct=2838, bcdDevice= 1.00
+[ 5121.563464] usb 1-4.3.6: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[ 5121.563468] usb 1-4.3.6: Product: RTL2838UHIDIR
+[ 5121.563472] usb 1-4.3.6: Manufacturer: Realtek
+[ 5121.563496] usb 1-4.3.6: SerialNumber: 1004
+[ 5499.061555] ptrace attach of "./ogn-rf /tmp/ogn-test.conf"[8795] was attempted by "gdb -p 8795 -batch -ex thread apply all bt"[8801]
+[ 8190.009565] sudo-daq-run.sh (15358): drop_caches: 3
+[ 8390.887951] sudo-daq-run.sh (15584): drop_caches: 3

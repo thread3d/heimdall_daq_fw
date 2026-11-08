@@ -1,4 +1,0 @@
--rw-r--r-- 1 root root  2098176 Nov  8 13:09 decimator_in_A
--rw-r--r-- 1 root root  2098176 Nov  8 13:09 decimator_in_B
--rw-r--r-- 1 root root 67109888 Nov  8 13:09 decimator_out_A
--rw-r--r-- 1 root root 67109888 Nov  8 13:09 decimator_out_B

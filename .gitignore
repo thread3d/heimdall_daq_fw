@@ -18,3 +18,6 @@ Firmware/_testing/test_logs/*.html
 Firmware/__pycache__/*
 # Build dependencies (NE10 clone etc.)
 deps/
+
+# Run bundles written by scripts/sudo-daq-run.sh (artifacts, not source)
+/logs/

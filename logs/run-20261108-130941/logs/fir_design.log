@@ -1,8 +1,0 @@
-Desig FIR filter with the following parameters: 
-Decimation ratio: 1
-Bandwidth: 1.00
-Tap size: 1
-Window function: hann
-FIR filter ready
-Transfer funcfion is exported to :  _logs/Decimator_filter_transfer.html
-Coefficients are exported to:  _data_control/fir_coeffs.txt

@@ -264,7 +264,13 @@ fi
 # ------------------------------------------------------------------- run it
 step "starting DAQ chain"
 info "LD_LIBRARY_PATH=$PREFIX/lib"
-if [ -n "$CHRT" ]; then info "real-time priority: chrt -f 99"; else warn "chrt unavailable"; fi
+if [ -n "$CHRT" ]; then
+  info "real-time priority: chrt -f 99"
+elif [ "$USE_RT" = "1" ]; then
+  warn "USE_RT=1 but chrt is not installed -- running at normal priority"
+else
+  info "real-time priority: off (USE_RT=1 to enable)"
+fi
 
 $CHRT "$CORE/rtl_daq.out" 2> "$OUT/logs/rtl_daq.log" | \
 $CHRT "$CORE/rebuffer.out" 0 2> "$OUT/logs/rebuffer.log" &

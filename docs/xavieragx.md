@@ -8,23 +8,28 @@ receiver-side integration.
 
 ## Status
 
-**The DAQ chain runs on the Xavier and produces real IQ frames — for one channel.**
+**The DAQ chain runs on the Xavier and produces real IQ frames on all five channels, concurrently.**
 
 ```
-frame  0: type=0 chs=1 cpi=1048576 depth=32B dtype=3 fs=1.024 MHz fc=868.300 MHz block=3 cpi_idx=0
-          raw[0..7] as float32: 0.0431373 -0.027451 -0.027451 -0.0431373 0.0352941 ...
-          ch0=-21.3dBFS
+frame 0: type=0 chs=5 cpi=1048576 depth=32B dtype=3 fs=1.024 MHz fc=868.300 MHz block=3
+         ch0=-29.4dBFS ch1=-31.4dBFS ch2=-31.7dBFS ch3=-31.1dBFS ch4=-29.3dBFS
+
+frames read from decimator_out : 8 / 8
+libusb submit failures         : 0
 ```
 
-Frames carry a valid sync word, the configured centre frequency, `cpi=1048576` samples at
-1.024 MHz, and timestamps exactly one CPI (1.024 s) apart. Sample values are float32 but scaled to
-±1/255 because they begin life as 8-bit RTL samples (`dtype=3`).
+Five independent channels over one USB link, each on its own antenna, with per-channel powers that
+differ the way five separate receivers should. Timestamps advance exactly one CPI (1.024 s) apart.
+Samples are float32 but scaled to ±1/255 because they start life as 8-bit RTL samples (`dtype=3`).
 
-**Five channels do not work yet**, and the reason is precise: libusb's `usbfs_memory_mb` cap is
-16 MB and HeIMDALL needs it unlimited. That requires root — see "The blocker" below.
+This is the same run that used to fail: **the 16 MB `usbfs_memory_mb` cap was the entire blocker**
+for multi-channel operation, and it is also what broke the earlier five-concurrent-SoapySDR-streams
+attempt. One `echo 0 > /sys/module/usbcore/parameters/usbfs_memory_mb` fixes both. See
+"The blocker" below, and `scripts/sudo-daq-run.sh` to run it.
 
-Note this chain is **not coherent**: `delay_sync.py` did not run, so no phase calibration has been
-applied. That is enough to prove acquisition; it is not enough for direction finding.
+**This chain is NOT coherent.** `delay_sync.py` did not run (it needs `skrf` and `numba`, neither
+installable here without conda), so no phase calibration has been applied. Acquisition is proven;
+direction finding is not.
 
 ## What was needed to build it
 
